@@ -81,14 +81,14 @@ settings:
   state_file_path: "~/.config/dual_os_sync/sync_state.json"
 
 access:
-  linux_mount_win_c: "/home/xhkzdepartedream/windows_c"
-  linux_mount_win_d: "/home/xhkzdepartedream/data"
-  linux_mount_win_e: "/home/xhkzdepartedream/data2"
+  linux_mount_win_c: "/home/user/windows_c"
+  linux_mount_win_d: "/home/user/data"
+  linux_mount_win_e: "/home/user/data2"
 
 base_mappings:
-  - id: dl_workspace
-    win: "E:\\DL\\"
-    linux: "/home/xhkzdepartedream/data2/DL/"
+  - id: workspace
+    win: "E:\\files\\"
+    linux: "/home/user/data2/files/"
 ```
 
 | Section | Purpose |
@@ -143,8 +143,8 @@ Options:
 
 ```
 [SYNCED]   auto: D:\tools\sync — /src → /dst
-[OK]       auto: E:\DL\vggt — already in sync
-[DRY-RUN]  auto: C:\Users\30413 — would sync ... → ...
+[OK]       auto: E:\DL\test — already in sync
+[DRY-RUN]  auto: C:\Users\12345 — would sync ... → ...
 [CONFLICT] auto: E:\notes\... — split-brain detected, backed up
 [ERROR]    auto: D:\sync — target parent is read-only, aborting
 [SKIP]     auto: ... — neither side has data
