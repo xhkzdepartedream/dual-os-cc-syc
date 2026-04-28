@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Sync state (user-specific)
+sync_state.json
+
+# Temp sync directory
+.tmp_sync/
+
+# Claude Code project config
+.claude/
+
+# Backup files
+*.bak
+
+# Editor files
+*.swp
+*.swo
+*~

@@ -1,0 +1,31 @@
+# Dual-OS Context Sync — 配置文件
+# ===============================================
+
+settings:
+  sync_strategy: "auto_newest"  # auto_newest | force_win_to_linux | force_linux_to_win
+  state_file_path: "~/.config/dual_os_sync/sync_state.json"
+
+# 跨操作系统访问对方文件系统的挂载点配置
+access:
+  linux_mount_win_c: "/home/xhkzdepartedream/windows_c"
+  linux_mount_win_d: "/home/xhkzdepartedream/data"
+  linux_mount_win_e: "/home/xhkzdepartedream/data2"
+  # 在 Windows 上运行时: Linux 根目录 / → Z:\ （一般不配置，Windows 无法直接读 ext4）
+  win_mount_linux_root: null
+
+# 基础路径映射规则：将 Windows 绝对路径前缀映射为 Linux 路径前缀
+# 内容替换时会自动处理大小写（E:\ 和 e:\ 等效）以及 JSON 转义
+base_mappings:
+  - id: dl_workspace
+    win: "E:\\DL\\"
+    linux: "/home/xhkzdepartedream/data2/DL/"
+
+# 同步任务列表
+tasks:
+  - name: "Claude Code - VGGT"
+    type: "two_way_sync"
+    depends_on: "dl_workspace"          # 绑定上述映射规则用于路径替换
+    win_path: "C:\\Users\\30413\\.claude\\projects\\e--DL-vggt"
+    linux_path: "/home/xhkzdepartedream/.claude/projects/-home-xhkzdepartedream-data2-DL-vggt"
+    regex_replace: true
+    target_extensions: [".jsonl", ".json"]  # 仅对这些后缀的文件执行内容替换

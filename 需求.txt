@@ -1,0 +1,56 @@
+# 产品需求文档 (PRD)：双系统跨平台状态同步与映射工具 (Dual-OS Context Sync)
+
+## 1. 项目概述
+本项目旨在开发一个自动化守护进程/脚本工具，用于在双系统（Windows & Linux）之间同步特定的开发环境状态和应用缓存（如 Claude Code 对话记录）。工具需要能够处理不同操作系统下的绝对路径差异，并在同步时自动进行深度的路径文本替换。
+
+## 2. 核心功能需求 (Core Features)
+
+* **智能方向判定 (Direction Detection):**
+    * 工具在执行时（通常是开机触发），需对比双端同步目录的状态，判断出哪一端包含“最新”的数据。
+    * 判断依据应为核心文件的最后修改时间（`mtime`）或统一维护的本地 `.sync_state.json` 状态日志，而不是仅依赖外层文件夹的时间戳。
+* **基础路径映射 (Base Path Mapping):**
+    * 支持定义全局的系统路径映射规则。
+    * 例如：定义 `E:\DL\` (Windows) <--> `~/.data2/DL/` (Linux) 的双向映射关系。
+* **挂载点与任务配置 (Task Mounts):**
+    * 在基础映射之上，允许配置多个特定的同步任务。
+    * 任务需明确 Windows 源路径和 Linux 目标路径（例如 `C:\Users\30413\.claude\projects\e--DL--vggt` 到对应的 Linux 目录）。
+* **深度内容替换 (Deep Content Regex Replacement):**
+    * 在执行文件拷贝后，工具需扫描目标文件夹内的指定类型文件（如 `.jsonl`, `.json`, `.yaml`, `.txt` 等文本文件）。
+    * 应用基础路径映射规则，将文件内容中的绝对路径动态替换为当前系统的正确路径。
+    * **关键要求：** 正则表达式必须具备处理 JSON 文件中常见转义字符（如 `\\`、`\\\\` 等）的能力。
+* **文件类型过滤 (Extension Filtering):**
+    * 纯文本文件（上述配置的后缀）执行内容替换。
+    * 二进制文件（如图片、数据库文件、预编译模型等）仅执行文件系统级别的覆盖/拷贝，**严格禁止**对二进制文件执行正则替换，以防文件损坏。
+
+## 3. 配置文件规范 (Configuration Schema 设计)
+期望使用易于人机阅读的格式（如 YAML），由 AI 自动生成解析模块。
+
+```yaml
+# config.yaml 示例
+settings:
+  sync_strategy: "auto_newest" # 或 "force_win_to_linux" 等
+  state_file_path: "~/.config/dual_os_sync/sync_state.json" # 用于记录上次同步时间
+
+base_mappings:
+  - id: dl_workspace
+    win: "E:\\DL\\"
+    linux: "/home/user/.data2/DL/"
+
+tasks:
+  - name: "Claude Code - VGGT"
+    type: "two_way_sync"
+    depends_on: "dl_workspace" # 绑定映射关系用于正则替换
+    win_path: "C:\\Users\\30413\\.claude\\projects\\e--DL--vggt"
+    linux_path: "/home/user/.claude/projects/mnt-e--DL--vggt" # 假定Linux下的目录名
+    regex_replace: true
+    target_extensions: [".jsonl", ".json"] # 仅替换这些文件的内容
+```
+
+## 4. 异常处理与防呆机制 (Safety Fallbacks)
+* **防只读锁 (Read-only Protection):** 如果检测到目标路径所在的磁盘被挂载为只读（如 Windows 未彻底关机导致的 NTFS 锁），脚本需立即中止并抛出明确的日志错误，禁止静默失败。
+* **防冲突 (Split-Brain Protection):** 如果 `sync_state.json` 发现自上次同步后，Windows 和 Linux 两端的数据都被修改过，脚本需暂停自动覆盖，并生成冲突日志或将旧文件备份为 `.bak`。
+* **原子性操作 (Atomicity):** 避免在覆盖大文件时发生断电或中断，可以先同步到临时文件夹（`.tmp_sync`），验证无误后再通过 `mv` 操作替换原目录。
+
+## 5. 部署目标 (Deployment Target)
+* **Linux 端:** 期望通过 `systemd` service 实现开机/用户登录时自启，或者作为单纯的 CLI 工具被 shell alias 调用。
+* **Windows 端:** 期望支持通过 Task Scheduler (任务计划程序) 挂载开机触发。
