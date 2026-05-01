@@ -122,18 +122,12 @@ def run_prune(
 def _count_user_prompts(path: Path) -> int:
     """Count real user messages in a JSONL session file.
 
-    Skips infrastructure entries that Claude Code records as ``type: "user"``
-    but are not actual conversation messages:
-
-    * Built-in slash commands (e.g. ``/model``, ``/help``)
-    * Local command execution tracking (``<local-command-caveat>``,
-      ``<command-name>``, ``<command-message>``, ``<local-command-stdout>``)
-    * System reminders and session renames (``<system-reminder>``)
+    Skips pure infrastructure entries but **counts** skill/command
+    invocations that carry meaningful arguments (``<command-args>``).
     """
-    _INFRA_PREFIXES = (
+    # Entries that are never user messages
+    _ALWAYS_SKIP = (
         "<local-command-caveat>",
-        "<command-name>",
-        "<command-message>",
         "<local-command-stdout>",
         "<system-reminder>",
     )
@@ -147,23 +141,50 @@ def _count_user_prompts(path: Path) -> int:
                     continue
                 try:
                     obj = json.loads(line)
-                    if obj.get("type") == "user":
-                        content = obj.get("message", {}).get("content", "")
-                        if not isinstance(content, str):
-                            continue
-                        # Skip bare slash commands (/model, /help, etc.)
-                        if content.startswith("/"):
-                            continue
-                        # Skip infrastructure XML blocks
-                        if content.startswith(_INFRA_PREFIXES):
-                            continue
-                        count += 1
+                    if obj.get("type") != "user":
+                        continue
+
+                    content = obj.get("message", {}).get("content", "")
+                    if not isinstance(content, str):
+                        continue
+
+                    # 1. Pure infrastructure → skip unconditionally
+                    if content.startswith(_ALWAYS_SKIP):
+                        continue
+
+                    # 2. Bare slash command (e.g. /model, /help with no args)
+                    if content.startswith("/"):
+                        continue
+
+                    # 3. XML-wrapped command (/command-name, /command-message):
+                    #    count it only when <command-args> is non-empty
+                    if content.startswith(("<command-name>", "<command-message>")):
+                        a = _extract_tag(content, "<command-args>", "</command-args>")
+                        if a.strip():
+                            count += 1
+                        continue
+
+                    # 4. Plain text user message
+                    count += 1
+
                 except json.JSONDecodeError:
                     continue
     except OSError:
         logger.warning("Cannot read %s — skipping", path)
         return 0
     return count
+
+
+def _extract_tag(text: str, open_tag: str, close_tag: str) -> str:
+    """Extract content between *open_tag* and *close_tag*."""
+    start = text.find(open_tag)
+    if start < 0:
+        return ""
+    start += len(open_tag)
+    end = text.find(close_tag, start)
+    if end < 0:
+        return ""
+    return text[start:end]
 
 
 def _delete_session(projects_dir: Path, session_id: str) -> None:
