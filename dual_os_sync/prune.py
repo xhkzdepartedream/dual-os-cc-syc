@@ -120,11 +120,24 @@ def run_prune(
 
 
 def _count_user_prompts(path: Path) -> int:
-    """Count lines where ``type`` is ``"user"`` in a JSONL file.
+    """Count real user messages in a JSONL session file.
 
-    Skips built-in slash commands (e.g. ``/model``, ``/help``) since they
-    are not real conversation messages.
+    Skips infrastructure entries that Claude Code records as ``type: "user"``
+    but are not actual conversation messages:
+
+    * Built-in slash commands (e.g. ``/model``, ``/help``)
+    * Local command execution tracking (``<local-command-caveat>``,
+      ``<command-name>``, ``<command-message>``, ``<local-command-stdout>``)
+    * System reminders and session renames (``<system-reminder>``)
     """
+    _INFRA_PREFIXES = (
+        "<local-command-caveat>",
+        "<command-name>",
+        "<command-message>",
+        "<local-command-stdout>",
+        "<system-reminder>",
+    )
+
     count = 0
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -136,8 +149,13 @@ def _count_user_prompts(path: Path) -> int:
                     obj = json.loads(line)
                     if obj.get("type") == "user":
                         content = obj.get("message", {}).get("content", "")
-                        # Skip built-in slash commands
-                        if isinstance(content, str) and content.startswith("/"):
+                        if not isinstance(content, str):
+                            continue
+                        # Skip bare slash commands (/model, /help, etc.)
+                        if content.startswith("/"):
+                            continue
+                        # Skip infrastructure XML blocks
+                        if content.startswith(_INFRA_PREFIXES):
                             continue
                         count += 1
                 except json.JSONDecodeError:
