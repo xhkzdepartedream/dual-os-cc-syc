@@ -216,10 +216,18 @@ def _filter_tasks(config: AppConfig, task_filter: str | None) -> list[TaskConfig
 
 
 def _backup_target(target_dir: Path, task: TaskConfig) -> None:
-    """Rename *target_dir* to ``<name>.bak`` to preserve conflicting data."""
+    """Rename *target_dir* to ``<name>.bak`` to preserve conflicting data.
+
+    Strips any existing ``.bak`` suffixes first so repeated split-brain
+    detection produces ``name.bak`` instead of ``name.bak.bak.bak``.
+    """
     if not target_dir.exists():
         return
-    bak = target_dir.with_name(target_dir.name + ".bak")
+    # Strip any .bak suffixes so we always produce exactly one
+    stem = target_dir.name
+    while stem.endswith(".bak"):
+        stem = stem[:-4]
+    bak = target_dir.with_name(stem + ".bak")
     if bak.exists():
         shutil.rmtree(bak)
     os.rename(target_dir, bak)

@@ -107,10 +107,15 @@ def scan_projects(root: Path) -> dict[str, Path]:
     """Scan a ``.claude/projects/`` directory.
 
     Returns ``{dir_name: project_dir_path}``.
+    Skips directories ending with ``.bak`` to avoid picking up
+    split-brain backups as valid projects.
     """
     if not root.is_dir():
         return {}
-    return {d.name: d for d in root.iterdir() if d.is_dir()}
+    return {
+        d.name: d for d in root.iterdir()
+        if d.is_dir() and not d.name.endswith(".bak")
+    }
 
 
 def find_linux_project_by_cwd(

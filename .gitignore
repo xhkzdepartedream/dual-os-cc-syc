@@ -21,3 +21,10 @@ sync_state.json
 *.swp
 *.swo
 *~
+
+# Documentation (Chinese) — not intended for the public repo
+开发日志.md
+设计文档.md
+使用指南.md
+需求.txt
+2026-04-28-181528-example.txt

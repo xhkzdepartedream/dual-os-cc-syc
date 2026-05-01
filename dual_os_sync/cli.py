@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .auto_discover import auto_discover
 from .config import AppConfig
+from .prune import run_prune
 from .sync_engine import run_sync
 
 
@@ -25,25 +26,31 @@ def main(argv: list[str] | None = None) -> None:
 
     config = AppConfig.from_yaml(config_path)
 
-    if args.auto:
+    if args.auto or args.prune is not None:
         tasks, inferred = auto_discover(config)
         if not tasks:
-            print("[SKIP] No projects discovered to sync")
+            print("[SKIP] No projects discovered")
             return
         logger = logging.getLogger(__name__)
         logger.info("Auto-discovered %d task(s)", len(tasks))
-        # Inject inferred base mappings so tasks can find them by depends_on
         config.base_mappings.extend(inferred)
-        # Replace configured tasks with auto-discovered ones
         object.__setattr__(config, "tasks", tasks)
 
-    reports = run_sync(
-        config,
-        task_filter=args.task,
-        dry_run=args.dry_run,
-        force_direction=args.force,
-        force_sync=args.force_sync,
-    )
+    if args.prune is not None:
+        reports = run_prune(
+            config,
+            list(config.tasks),
+            min_user_prompts=args.prune,
+            dry_run=args.dry_run,
+        )
+    else:
+        reports = run_sync(
+            config,
+            task_filter=args.task,
+            dry_run=args.dry_run,
+            force_direction=args.force,
+            force_sync=args.force_sync,
+        )
 
     for line in reports:
         print(line)
@@ -89,6 +96,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force-sync",
         action="store_true",
         help="Ignore saved state and always sync (picks the newer side)",
+    )
+    p.add_argument(
+        "--prune",
+        type=int,
+        metavar="N",
+        nargs="?",
+        const=1,
+        default=None,
+        help="Delete sessions with fewer than N user prompts (default: 1). "
+             "Operates on both OS sides. Implies --auto.",
     )
     return p
 
